@@ -1,0 +1,12 @@
+[
+  {"name": "Liquid LFM3 1.7B", "id": "liquid/lfm-3-1.7b", "parameters": "1.7B"},
+  {"name": "Llama 3.2 3B Instruct", "id": "meta-llama/llama-3.2-3b-instruct", "parameters": "3B"},
+  {"name": "Ministral 3 3B", "id": "mistralai/ministral-3b-2512", "parameters": "3B"},
+  {"name": "Gemma 3 4B", "id": "google/gemma-3-4b-it", "parameters": "4B"},
+  {"name": "Llama 3.1 8B Instruct", "id": "meta-llama/llama-3.1-8b-instruct", "parameters": "8B"},
+  {"name": "Ministral 3 8B", "id": "mistralai/ministral-8b-2512", "parameters": "8B"},
+  {"name": "Granite 4.2 8B", "id": "ibm-granite/granite-4.2-8b", "parameters": "8B"},
+  {"name": "Qwen3.5 9B", "id": "qwen/qwen3.5-9b", "parameters": "9B"},
+  {"name": "Gemma 3 12B", "id": "google/gemma-3-12b-it", "parameters": "12B"},
+  {"name": "Phi-4 14B", "id": "microsoft/phi-4", "parameters": "14B"}
+]
