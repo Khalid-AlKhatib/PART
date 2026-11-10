@@ -1,0 +1,69 @@
+name: PART Small LLM Evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type RUN to approve OpenRouter API calls'
+        required: true
+        default: 'NO'
+        type: string
+      sample_size:
+        description: 'Balanced training examples per model'
+        required: true
+        default: '100'
+        type: choice
+        options:
+          - '10'
+          - '50'
+          - '100'
+
+permissions:
+  contents: read
+
+jobs:
+  compare-models:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Confirm paid evaluation
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != 'RUN' ]; then
+            echo 'Not running: set confirm to RUN after reviewing models and prompts.'
+            exit 1
+          fi
+
+      - name: Download public training data
+        run: |
+          mkdir -p data
+          curl --fail --location --retry 3 --silent --show-error \
+            'https://huggingface.co/datasets/michiel/argpart/resolve/main/data/train.jsonl' \
+            --output data/train.jsonl
+
+      - name: Compare models using OpenRouter
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          SAMPLE_SIZE: ${{ inputs.sample_size }}
+        run: |
+          python3 experiments/run_small_llms.py \
+            --data data/train.jsonl \
+            --sample-size "$SAMPLE_SIZE" \
+            --seed 42 \
+            --workers 3 \
+            --output-dir results/small_llms
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: part-small-llms-${{ github.run_id }}
+          path: results/small_llms/
+          if-no-files-found: ignore
