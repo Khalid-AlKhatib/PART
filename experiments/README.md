@@ -27,7 +27,7 @@ at the end of the puzzle. Do not include an explanation.
 
 ## Results
 
-The results below are on the **same 100 publicly released training examples**, not the hidden test set. Task 1 uses macro-F1; Task 2 uses strict exact match of the accepted-witness set. Both are shown as percentages. `Valid` is the number of outputs successfully parsed (out of 100 for each task); `errors` counts recorded request errors across both tasks (out of 200).
+Task 1 uses macro-F1; Task 2 uses strict exact match of the accepted-witness set. Scores are percentages on the 100 training examples. `Valid` means parsed answers (out of 100 per task); `Errors` counts failed requests (out of 200 per model).
 
 | Model | Official 8B cap | Task 1 macro-F1 | Task 1 valid | Task 2 exact | Task 2 valid | Errors |
 | --- | :---: | ---: | ---: | ---: | ---: | ---: |
@@ -42,9 +42,7 @@ The results below are on the **same 100 publicly released training examples**, n
 | Gemma 3 12B | **Above** | 45.6% | 83 | 0% | 92 | 0 |
 | Phi-4 14B | **Above** | **56.0%** | 99 | **3%** | 67 | 0 |
 
-**Interpretation and limits:** This was one zero-shot prompting configuration at temperature 0 with a 1,024 completion-token cap, not a comparison of fine-tuning or specialized prompting. Some calls failed or returned unparseable/empty responses; the cap may have constrained reasoning models. In particular, **0% with zero valid outputs does not establish that a model cannot reason**. Three models exceeded the official 8B inference cap and were included only as diagnostics. Inference parameter count alone does not establish eligibility under the [official licensing and API rules](https://argpart.github.io/#dataset). Invalid answers were counted as incorrect for these end-to-end metrics.
-
-The [symbolic baseline](../README.md#finding-1-a-symbolic-baseline-solves-the-training-data) scored 100% on both tasks across all 3,000 published training items. This contrast motivates an LLM-specific study, but it cannot by itself separate failures of graph extraction, inference, and formatting.
+Some models returned empty or unparseable answers, counted as incorrect. The 1,024-token limit may have affected reasoning models, particularly those with zero valid responses. The three models above 8B were included for comparison. All results are from the published training set, using one zero-shot prompt configuration.
 
 ## How To Re-run
 
