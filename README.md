@@ -1,16 +1,22 @@
-# PART: Small-Language-Model Reasoning Diagnostics
+# PART: Rule-Based and Small-LLM Experiments
 
-This repository contains **independent diagnostic experiments** for the [PART shared task](https://argpart.github.io/), not the official submission system. The [official website](https://argpart.github.io/#dataset) remains the authoritative source for submission rules.
+We ran two experiments on the [PART shared task](https://argpart.github.io/): a **rule-based baseline** and a **comparison of ten small language models**. Both address the task's witness-testimony puzzles: Task 1 predicts whether a statement can be believed; Task 2 identifies which witnesses can be believed.
 
-PART uses **synthetic witness-testimony puzzles** generated from directed argumentation attack graphs. Task 1 asks whether a specified statement is believable (`yes`/`no`); Task 2 asks for the set of believable witnesses. These controlled puzzles can test how small language models interpret relations and apply a multi-step acceptance rule. They are **not** a realistic representation of human argumentation or evidence assessment.
+## Results at a Glance
 
-In the published training data, the graphs are acyclic. Once the attacks are correctly extracted, computing acceptance is deterministic and relatively easy. A language model's end-to-end errors may therefore come from **relation extraction, multi-step reasoning, or answer formatting**; the final score alone does not identify which part failed.
+| Experiment | Training examples | Task 1 macro-F1 | Task 2 exact match |
+| --- | ---: | ---: | ---: |
+| Rule-based parser + graph reasoning | 3,000 | **100%** | **100%** |
+| Best model at or below 8B: Llama 3.1 8B Instruct | 100 | **50.8%** | **1%** |
+| Best of all ten tested: Phi-4 14B | 100 | **56.0%** | **3%** |
 
-## Finding 1: A Symbolic Baseline Solves the Training Data
+The LLM experiment used the same balanced 100-item sample for every model; the rule-based baseline was evaluated on all 3,000 published training examples. Full model-by-model results are in [the LLM experiment report](experiments/README.md).
 
-We tested whether the [PART shared task](https://argpart.github.io/) can be solved without an LLM. A simple rule-based program achieved **100% on both tasks across all 3,000 published training examples**.
+## Experiment 1: Rule-Based Baseline
 
-## How Does the Rule Baseline Work?
+A simple rule-based program achieved perfect scores on the published training set without using an LLM.
+
+### How It Works
 
 Attack statements follow a predictable pattern:
 
@@ -38,21 +44,15 @@ Witness Charlie says that Bob is lying
 
 Charlie is believable, so Bob is not. Since Bob is not believable, Alice is believable. The answers are **yes** for Task 1 and **Alice, Charlie** for Task 2.
 
-**Main finding:** The current training examples can be solved by matching text patterns and applying a graph algorithm. The program does not need to understand the meaning of the statements. This makes the released training set a weak discriminator of *unrestricted* computational methods, while leaving an interesting question about what a small language model can do internally.
+**Finding:** The published training examples can be solved by matching text patterns and applying a graph algorithm. The program does not need to interpret the meaning of the statements.
 
-## Finding 2: Ten Small-Model Prompting Experiments
+## Experiment 2: Ten Small LLMs
 
-We also completed a diagnostic comparison of ten language models on a **balanced sample of 100 published training puzzles**, using the original Task 1 and Task 2 prompts (2,000 attempted model calls in total). The best Task 1 macro-F1 among models at or below 8B was **50.8%**, and the highest Task 2 strict exact match in that group was **1%**. Several models produced errors or unusable outputs, so these figures are not definitive model capability rankings. See the exact prompt, per-model scores, and caveats in [`experiments/README.md`](experiments/README.md).
+We compared ten models using a **balanced sample of 100 training puzzles** (50 `yes` and 50 `no`). Each model received the original Task 1 and Task 2 prompts separately: **2,000 attempted calls** altogether. We used temperature `0`, no examples, and a maximum of 1,024 completion tokens.
 
-This comparison is **not an official PART submission**: three tested models exceed the official inference parameter cap, and official eligibility also depends on model licenses and API restrictions.
+The best model within the official 8B parameter cap was **Llama 3.1 8B Instruct** (50.8% Task 1 macro-F1, 1% Task 2 exact match). **Phi-4 14B** scored highest overall (56.0% and 3%), though it exceeds that cap.
 
-## Proposed LLM-Focused Methodology
-
-Based on these findings, a precise research objective for PART would be: **Can small language models solve and generalize across structured argumentation puzzles directly from natural language, without outsourcing the decisions to a hand-coded parser or symbolic graph solver?**
-
-We have documented a possible LLM-only inference policy in [`METHOD_ELIGIBILITY_PROPOSAL.md`](METHOD_ELIGIBILITY_PROPOSAL.md). It distinguishes **model-generated intermediate graphs and step-by-step reasoning** (allowed) from **external task-specific rules and executed graph solvers** (not allowed). It also proposes method disclosure and diagnostic evaluations by graph depth, language variation, and output compliance.
-
-**Important: This is a discussion proposal, not an adopted rule.** The official PART website currently requires open-weight inference models totaling at most 8B parameters, restricts ensembles and mixture-of-experts by total parameters, and prohibits closed commercial APIs at every stage. It does **not** currently state an explicit ban on symbolic post-processing; the organizers would need to approve and publish any such change.
+See [Experiment 2: models, exact prompts, full scores, and instructions](experiments/README.md). Some models produced empty or invalid responses, which are reflected in the reported scores.
 
 ## How To Reproduce the Rule Baseline
 
@@ -76,4 +76,4 @@ python3 argpart_rule_baseline.py data/train.jsonl
 
 We obtained **3,000/3,000 correctly parsed**, **Task 1 macro-F1 = 1.0**, and **Task 2 exact-match accuracy = 100%**.
 
-These results are for the **training set**, not the hidden test set. The program assumes the current statement templates and acyclic attack graphs.
+The rule baseline assumes the current statement templates and acyclic attack graphs. All results reported here are on the **published training set**, not the hidden test set.
