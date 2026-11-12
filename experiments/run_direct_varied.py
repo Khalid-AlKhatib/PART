@@ -5,12 +5,14 @@ The three models, puzzle texts, and API settings match the graph-extraction
 experiment. Here the models answer each task directly; no graph is extracted
 or passed to the symbolic solver. In gold-graph mode, the models receive the
 correct directed edges instead of witness statements. Both tasks get separate
-requests.
+requests. The gold-graph-steps condition asks for explicit witness-by-witness
+reasoning before the final answer.
 
 Usage:
   python3 experiments/run_direct_varied.py --dry-run
   python3 experiments/run_direct_varied.py
   python3 experiments/run_direct_varied.py --input-mode gold_graph --output-dir results/gold_graph
+  python3 experiments/run_direct_varied.py --input-mode gold_graph_steps --output-dir results/gold_graph_steps
   python3 experiments/run_direct_varied.py --score-responses results/direct_varied/responses.jsonl
 """
 
@@ -31,6 +33,18 @@ from run_small_llms import (SYSTEM_PROMPT, ask_openrouter,
 
 
 TASKS = ("binary", "multi_label")
+
+STEP_BY_STEP_SYSTEM_PROMPT = (
+    "Solve the witness credibility puzzle by applying its rule step by step. "
+    "Briefly show the credibility decision for each witness, starting with "
+    "witnesses who have no attackers. Then give the final answer in the exact "
+    "format requested at the end of the puzzle."
+)
+
+
+def system_prompt_for(input_mode):
+    return (STEP_BY_STEP_SYSTEM_PROMPT if input_mode == "gold_graph_steps"
+            else SYSTEM_PROMPT)
 
 
 def build_gold_graph_problem(record):
@@ -53,7 +67,7 @@ def build_prompt(record, task, input_mode="text"):
     """Return the task question over either original text or the gold graph."""
     if input_mode == "text":
         puzzle = record["prompt"]
-    elif input_mode == "gold_graph":
+    elif input_mode in ("gold_graph", "gold_graph_steps"):
         puzzle = build_gold_graph_problem(record)
     else:
         raise ValueError(f"Unknown input mode: {input_mode}")
@@ -73,6 +87,17 @@ def build_prompt(record, task, input_mode="text"):
         )
     else:
         raise ValueError(f"Unknown task: {task}")
+    if input_mode == "gold_graph_steps":
+        puzzle += (
+            "\n\nWork through the graph in these steps:\n"
+            "1. Find witnesses with no incoming attacks. They are believable.\n"
+            "2. Find witnesses whose attackers have all been evaluated. "
+            "If at least one attacker is believable, mark the witness "
+            "unbelievable; otherwise mark the witness believable.\n"
+            "3. Repeat until every witness has been evaluated. "
+            "Briefly show the decision for each witness.\n"
+            "4. End with only the final Answer line in the requested format."
+        )
     return puzzle + "\n\nFinal question: " + question
 
 
@@ -83,7 +108,8 @@ def evaluate_one(model, record, task, api_key, max_tokens, input_mode="text"):
     error = None
     try:
         response = ask_openrouter(model["id"], build_prompt(record, task, input_mode),
-                                  api_key, max_tokens)
+                                  api_key, max_tokens,
+                                  system_prompt=system_prompt_for(input_mode))
         content = response["choices"][0]["message"].get("content")
         raw = content if isinstance(content, str) else ""
         usage = response.get("usage") or {}
@@ -120,7 +146,9 @@ def main():
                         default=Path("experiments/graph_models.json"))
     parser.add_argument("--workers", type=int, default=3)
     parser.add_argument("--max-tokens", type=int, default=1536)
-    parser.add_argument("--input-mode", choices=["text", "gold_graph"], default="text")
+    parser.add_argument("--input-mode",
+                        choices=["text", "gold_graph", "gold_graph_steps"],
+                        default="text")
     parser.add_argument("--output-dir", type=Path,
                         default=Path("results/direct_varied"))
     parser.add_argument("--dry-run", action="store_true")
@@ -136,7 +164,7 @@ def main():
         "models": models,
         "input_mode": args.input_mode,
         "sample_ids": [r["id"] for r in cases],
-        "system_prompt": SYSTEM_PROMPT,
+        "system_prompt": system_prompt_for(args.input_mode),
         "user_prompt_example": {
             "id": cases[0]["id"],
             "binary": build_prompt(cases[0], "binary", args.input_mode),

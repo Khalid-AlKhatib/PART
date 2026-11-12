@@ -111,11 +111,12 @@ def check_models_available(models):
         raise RuntimeError("Models missing from current OpenRouter catalog: " + ", ".join(missing))
 
 
-def ask_openrouter(model_id, prompt, api_key, max_tokens):
+def ask_openrouter(model_id, prompt, api_key, max_tokens,
+                   system_prompt=SYSTEM_PROMPT):
     payload = {
         "model": model_id,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
         ],
         "temperature": 0,
