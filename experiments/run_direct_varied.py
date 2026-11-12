@@ -6,13 +6,15 @@ experiment. Here the models answer each task directly; no graph is extracted
 or passed to the symbolic solver. In gold-graph mode, the models receive the
 correct directed edges instead of witness statements. Both tasks get separate
 requests. The gold-graph-steps condition asks for explicit witness-by-witness
-reasoning before the final answer.
+reasoning before the final answer. The gold-graph-cot condition gives two
+worked examples with concise reasoning and correct final answers.
 
 Usage:
   python3 experiments/run_direct_varied.py --dry-run
   python3 experiments/run_direct_varied.py
   python3 experiments/run_direct_varied.py --input-mode gold_graph --output-dir results/gold_graph
   python3 experiments/run_direct_varied.py --input-mode gold_graph_steps --output-dir results/gold_graph_steps
+  python3 experiments/run_direct_varied.py --input-mode gold_graph_cot --output-dir results/gold_graph_cot
   python3 experiments/run_direct_varied.py --score-responses results/direct_varied/responses.jsonl
 """
 
@@ -41,9 +43,44 @@ STEP_BY_STEP_SYSTEM_PROMPT = (
     "format requested at the end of the puzzle."
 )
 
+# These demonstrations use different witness names from the evaluated cases.
+# Example 1 ends with a believable claimant; Example 2 with an unbelievable one.
+COT_EXAMPLES = (
+    {
+        "witnesses": ["A1", "A2", "A3", "A4"],
+        "gold_edges": [["A2", "A3"], ["A3", "A4"]],
+        "claim_speaker": "A4",
+        "gold_binary": "yes",
+        "gold_accepted": ["A1", "A2", "A4"],
+        "steps": [
+            "A1 and A2 have no attackers, so both are believable.",
+            "A3 is attacked by believable A2, so A3 is unbelievable.",
+            "A4 is attacked only by unbelievable A3, so A4 is believable.",
+        ],
+    },
+    {
+        "witnesses": ["B1", "B2", "B3", "B4", "B5", "B6"],
+        "gold_edges": [
+            ["B1", "B3"], ["B2", "B3"], ["B5", "B2"],
+            ["B3", "B4"], ["B4", "B6"], ["B1", "B6"],
+        ],
+        "claim_speaker": "B6",
+        "gold_binary": "no",
+        "gold_accepted": ["B1", "B4", "B5"],
+        "steps": [
+            "B1 and B5 have no attackers, so both are believable.",
+            "B2 is attacked by believable B5, so B2 is unbelievable.",
+            "B3 is attacked by believable B1, so B3 is unbelievable.",
+            "B4 is attacked only by unbelievable B3, so B4 is believable.",
+            "B6 is attacked by believable B1 and B4, so B6 is unbelievable.",
+        ],
+    },
+)
+
 
 def system_prompt_for(input_mode):
-    return (STEP_BY_STEP_SYSTEM_PROMPT if input_mode == "gold_graph_steps"
+    return (STEP_BY_STEP_SYSTEM_PROMPT if input_mode in
+            ("gold_graph_steps", "gold_graph_cot")
             else SYSTEM_PROMPT)
 
 
@@ -63,11 +100,38 @@ def build_gold_graph_problem(record):
     )
 
 
+def build_cot_examples(task):
+    """Show two correct worked examples of the requested task, before the test case."""
+    blocks = []
+    for index, example in enumerate(COT_EXAMPLES, 1):
+        if task == "binary":
+            question = f"Is witness {example['claim_speaker']}'s claim believable?"
+            answer = example["gold_binary"]
+        elif task == "multi_label":
+            question = "Which witnesses are believable?"
+            answer = repr(example["gold_accepted"])
+        else:
+            raise ValueError(f"Unknown task: {task}")
+        blocks.append(
+            f"Worked example {index}:\n"
+            + build_gold_graph_problem(example)
+            + "\nQuestion: " + question
+            + "\nReasoning:\n- " + "\n- ".join(example["steps"])
+            + "\nAnswer: " + answer
+        )
+    return (
+        "Here are two solved examples. Use the same short, witness-by-witness "
+        "reasoning for the new puzzle.\n\n"
+        + "\n\n".join(blocks)
+        + "\n\nNow solve this new puzzle:\n\n"
+    )
+
+
 def build_prompt(record, task, input_mode="text"):
     """Return the task question over either original text or the gold graph."""
     if input_mode == "text":
         puzzle = record["prompt"]
-    elif input_mode in ("gold_graph", "gold_graph_steps"):
+    elif input_mode in ("gold_graph", "gold_graph_steps", "gold_graph_cot"):
         puzzle = build_gold_graph_problem(record)
     else:
         raise ValueError(f"Unknown input mode: {input_mode}")
@@ -98,6 +162,8 @@ def build_prompt(record, task, input_mode="text"):
             "Briefly show the decision for each witness.\n"
             "4. End with only the final Answer line in the requested format."
         )
+    if input_mode == "gold_graph_cot":
+        puzzle = build_cot_examples(task) + puzzle
     return puzzle + "\n\nFinal question: " + question
 
 
@@ -147,7 +213,8 @@ def main():
     parser.add_argument("--workers", type=int, default=3)
     parser.add_argument("--max-tokens", type=int, default=1536)
     parser.add_argument("--input-mode",
-                        choices=["text", "gold_graph", "gold_graph_steps"],
+                        choices=["text", "gold_graph", "gold_graph_steps",
+                                 "gold_graph_cot"],
                         default="text")
     parser.add_argument("--output-dir", type=Path,
                         default=Path("results/direct_varied"))

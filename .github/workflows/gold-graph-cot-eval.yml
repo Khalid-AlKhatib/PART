@@ -1,0 +1,60 @@
+name: PART Small LLM Few-Shot Chain-of-Thought Graph Reasoning
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type RUN to approve 300 OpenRouter requests'
+        required: true
+        default: 'NO'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  gold-graph-cot-reasoning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Confirm evaluation
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != 'RUN' ]; then
+            echo 'Enter RUN to start the evaluation.'
+            exit 1
+          fi
+
+      - name: Validate graphs and few-shot prompts
+        run: |
+          python3 -m unittest discover -s tests -v
+          python3 experiments/run_direct_varied.py \
+            --input-mode gold_graph_cot \
+            --output-dir results/gold_graph_cot \
+            --dry-run
+
+      - name: Evaluate few-shot chain-of-thought on gold graphs
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          python3 experiments/run_direct_varied.py \
+            --data experiments/varied_attacks_50.jsonl \
+            --input-mode gold_graph_cot \
+            --workers 3 \
+            --max-tokens 1536 \
+            --output-dir results/gold_graph_cot
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: part-gold-graph-cot-${{ github.run_id }}
+          path: results/gold_graph_cot/
+          if-no-files-found: ignore
