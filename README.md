@@ -1,6 +1,6 @@
-# PART: Two Baseline Experiments
+# PART: Baselines and Graph Reasoning Experiments
 
-We evaluated the [PART shared task](https://argpart.github.io/) using a rule-based solver and ten language models. PART contains witness-testimony puzzles with two tasks: predicting whether a statement is believable (Task 1) and identifying all believable witnesses (Task 2).
+We evaluated the [PART shared task](https://argpart.github.io/) with a rule-based solver and language models, then studied attack extraction and graph reasoning separately. PART contains witness-testimony puzzles with two tasks: predicting whether a statement is believable (Task 1) and identifying all believable witnesses (Task 2).
 
 ## Results at a Glance
 
@@ -49,6 +49,23 @@ We compared ten models on **100 examples** (50 `yes`, 50 `no`), sending each the
 
 See the [model list, exact prompt, and full results](experiments/README.md), including valid-answer and error counts.
 
+## Experiment 3: Varied Attacks and Graph Reasoning
+
+We generated [50 more varied witness puzzles](experiments/varied_attacks.md) to test two challenges separately: identifying attack relations in text and reasoning over the resulting graph. The puzzles contain 17 attack-expression templates and five graph structures, with 25 `yes` and 25 `no` answers. All LLM settings used the same three small models and 50 cases.
+
+**Results (%):** Each cell shows **Task 1 accuracy / Task 2 exact match**.
+
+| Setting | Llama 3B | Gemma 4B | Llama 8B |
+| --- | ---: | ---: | ---: |
+| Original text → LLM answers | 54 / 0 | 50 / 0 | 42 / 0 |
+| Original text → LLM extracts attacks → graph solver | 26 / 18 | **70 / 38** | **62 / 42** |
+| Correct graph → LLM answers | 50 / 2 | 50 / 4 | 40 / 2 |
+| Correct graph → LLM, step-by-step | 34 / 0 | 56 / 0 | 36 / 4 |
+| Correct graph → LLM, two worked CoT examples | 52 / 2 | 54 / 6 | 44 / 6 |
+| Correct graph → deterministic solver | 100 / 100 | 100 / 100 | 100 / 100 |
+
+**Main finding:** Even with the correct attack graph, small LLMs struggle to apply the credibility rule; explicit steps and worked examples help little. Extracting attacks and then using a graph solver performs much better for the 4B and 8B models, though imperfect relation extraction still limits performance. See the [experiment details, prompts, and result runs](experiments/varied_attacks.md).
+
 ## Reproduce the Rule-Based Experiment
 
 Download the [training data](https://huggingface.co/datasets/michiel/argpart/tree/main/data) as `data/train.jsonl`, then run:
@@ -59,4 +76,4 @@ python3 argpart_rule_baseline.py data/train.jsonl
 
 Run unit tests with `python3 -m unittest discover -s tests -v`.
 
-Both experiments use the **published training set**. The rule-based method assumes the training set's statement patterns and acyclic attack graphs.
+Experiments 1–2 use the **published training set**; Experiment 3 uses newly generated puzzles. The rule-based method assumes acyclic attack graphs.
