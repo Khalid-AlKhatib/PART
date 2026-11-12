@@ -53,16 +53,29 @@ See the [model list, exact prompt, and full results](experiments/README.md), inc
 
 We generated [50 more varied witness puzzles](experiments/varied_attacks.md) to test two challenges separately: identifying attack relations in text and reasoning over the resulting graph. The puzzles contain 17 attack-expression templates and five graph structures, with 25 `yes` and 25 `no` answers. All LLM settings used the same three small models and 50 cases.
 
-**Results (%):** Each cell shows **Task 1 accuracy / Task 2 exact match**.
+The **text** settings give models witness statements; the **correct graph** settings give them the actual attack relations. The graph solver applies the credibility rule automatically.
 
-| Setting | Llama 3B | Gemma 4B | Llama 8B |
+**Task 1: Is the claim believable? (Accuracy, %)**
+
+| Method | Llama 3B | Gemma 4B | Llama 8B |
 | --- | ---: | ---: | ---: |
-| Original text → LLM answers | 54 / 0 | 50 / 0 | 42 / 0 |
-| Original text → LLM extracts attacks → graph solver | 26 / 18 | **70 / 38** | **62 / 42** |
-| Correct graph → LLM answers | 50 / 2 | 50 / 4 | 40 / 2 |
-| Correct graph → LLM, step-by-step | 34 / 0 | 56 / 0 | 36 / 4 |
-| Correct graph → LLM, two worked CoT examples | 52 / 2 | 54 / 6 | 44 / 6 |
-| Correct graph → deterministic solver | 100 / 100 | 100 / 100 | 100 / 100 |
+| Text → LLM answers | **54** | 50 | 42 |
+| Text → LLM extracts attacks → solver | 26 | **70** | **62** |
+| Correct graph → LLM answers | 50 | 50 | 40 |
+| Correct graph → LLM with reasoning steps | 34 | 56 | 36 |
+| Correct graph → LLM with two worked CoT examples | 52 | 54 | 44 |
+
+**Task 2: Which witnesses are believable? (Exact-match accuracy, %)**
+
+| Method | Llama 3B | Gemma 4B | Llama 8B |
+| --- | ---: | ---: | ---: |
+| Text → LLM answers | 0 | 0 | 0 |
+| Text → LLM extracts attacks → solver | **18** | **38** | **42** |
+| Correct graph → LLM answers | 2 | 4 | 2 |
+| Correct graph → LLM with reasoning steps | 0 | 0 | 4 |
+| Correct graph → LLM with two worked CoT examples | 2 | 6 | 6 |
+
+With a correct graph, the deterministic solver achieves **100% on both tasks**.
 
 **Main finding:** Even with the correct attack graph, small LLMs struggle to apply the credibility rule; explicit steps and worked examples help little. Extracting attacks and then using a graph solver performs much better for the 4B and 8B models, though imperfect relation extraction still limits performance. See the [experiment details, prompts, and result runs](experiments/varied_attacks.md).
 

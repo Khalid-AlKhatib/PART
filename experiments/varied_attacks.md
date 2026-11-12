@@ -26,16 +26,29 @@ The three models, all within the shared-task 8B cap, are Llama 3.2 3B, Gemma 3 4
 
 We also tested direct answers from text, and three LLM reasoning settings where the **correct attack graph** is provided: direct answers, explicit step-by-step reasoning, and few-shot chain-of-thought with two worked examples. Each setting evaluates both tasks separately.
 
-Each cell shows **Task 1 accuracy / Task 2 exact match**, in percent:
+In the **text** settings, models read witness statements. In the **correct graph** settings, models receive the gold attack edges directly.
 
-| Setting and result run | Llama 3B | Gemma 4B | Llama 8B |
+**Task 1: Claim believability (Accuracy, %)**
+
+| Method and result run | Llama 3B | Gemma 4B | Llama 8B |
 | --- | ---: | ---: | ---: |
-| [Text → direct LLM](https://github.com/Khalid-AlKhatib/PART/actions/runs/43218016452) | 54 / 0 | 50 / 0 | 42 / 0 |
-| [Text → extracted graph → solver](https://github.com/Khalid-AlKhatib/PART/actions/runs/43215144967) | 26 / 18 | **70 / 38** | **62 / 42** |
-| [Correct graph → direct LLM](https://github.com/Khalid-AlKhatib/PART/actions/runs/43234031619) | 50 / 2 | 50 / 4 | 40 / 2 |
-| [Correct graph → step-by-step LLM](https://github.com/Khalid-AlKhatib/PART/actions/runs/43236627708) | 34 / 0 | 56 / 0 | 36 / 4 |
-| [Correct graph → few-shot CoT LLM](https://github.com/Khalid-AlKhatib/PART/actions/runs/43246211923) | 52 / 2 | 54 / 6 | 44 / 6 |
-| Correct graph → deterministic solver | 100 / 100 | 100 / 100 | 100 / 100 |
+| [Text → direct LLM](https://github.com/Khalid-AlKhatib/PART/actions/runs/43218016452) | **54** | 50 | 42 |
+| [Text → extracted graph → solver](https://github.com/Khalid-AlKhatib/PART/actions/runs/43215144967) | 26 | **70** | **62** |
+| [Correct graph → direct LLM](https://github.com/Khalid-AlKhatib/PART/actions/runs/43234031619) | 50 | 50 | 40 |
+| [Correct graph → step-by-step LLM](https://github.com/Khalid-AlKhatib/PART/actions/runs/43236627708) | 34 | 56 | 36 |
+| [Correct graph → few-shot CoT LLM](https://github.com/Khalid-AlKhatib/PART/actions/runs/43246211923) | 52 | 54 | 44 |
+
+**Task 2: Identify all believable witnesses (Exact-match accuracy, %)**
+
+| Method and result run | Llama 3B | Gemma 4B | Llama 8B |
+| --- | ---: | ---: | ---: |
+| [Text → direct LLM](https://github.com/Khalid-AlKhatib/PART/actions/runs/43218016452) | 0 | 0 | 0 |
+| [Text → extracted graph → solver](https://github.com/Khalid-AlKhatib/PART/actions/runs/43215144967) | **18** | **38** | **42** |
+| [Correct graph → direct LLM](https://github.com/Khalid-AlKhatib/PART/actions/runs/43234031619) | 2 | 4 | 2 |
+| [Correct graph → step-by-step LLM](https://github.com/Khalid-AlKhatib/PART/actions/runs/43236627708) | 0 | 0 | 4 |
+| [Correct graph → few-shot CoT LLM](https://github.com/Khalid-AlKhatib/PART/actions/runs/43246211923) | 2 | 6 | 6 |
+
+With the correct graph, the deterministic solver achieves **100% on both tasks**.
 
 The attack-extraction edge F1 scores were **48.4% (3B), 79.0% (4B), and 67.6% (8B)**. Using the extracted graph with a deterministic solver improved Task 2 over direct LLM answers. Providing the correct graph to an LLM did not solve the problem: even with worked reasoning examples, the best Task 2 exact-match score was 6%.
 
