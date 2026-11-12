@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Direct-answer baseline on the same 50 varied PART-style puzzles.
+"""Direct-answer and gold-graph baselines on 50 varied PART-style puzzles.
 
 The three models, puzzle texts, and API settings match the graph-extraction
 experiment. Here the models answer each task directly; no graph is extracted
-or passed to the symbolic solver. Task 1 and Task 2 get separate requests.
+or passed to the symbolic solver. In gold-graph mode, the models receive the
+correct directed edges instead of witness statements. Both tasks get separate
+requests.
 
 Usage:
   python3 experiments/run_direct_varied.py --dry-run
   python3 experiments/run_direct_varied.py
+  python3 experiments/run_direct_varied.py --input-mode gold_graph --output-dir results/gold_graph
   python3 experiments/run_direct_varied.py --score-responses results/direct_varied/responses.jsonl
 """
 
@@ -30,8 +33,30 @@ from run_small_llms import (SYSTEM_PROMPT, ask_openrouter,
 TASKS = ("binary", "multi_label")
 
 
-def build_prompt(record, task):
-    """Return the same puzzle and a task-specific question; never include gold."""
+def build_gold_graph_problem(record):
+    """Expose the correct input graph without accepted labels or answers."""
+    arrows = "\n".join(f"- {source} -> {target}"
+                       for source, target in record["gold_edges"])
+    return (
+        "Witness credibility puzzle. A witness is believable if and only if "
+        "no believable witness attacks them. Each directed attack from A to B "
+        "means witness A accuses witness B of dishonesty. A believable "
+        "attacker defeats its target. The attack graph has no cycles.\n\n"
+        f"Witnesses: {', '.join(record['witnesses'])}.\n\n"
+        "Directed attacks (source -> target):\n"
+        + (arrows if arrows else "(none)")
+        + f"\n\nThe factual claim was made by witness {record['claim_speaker']}."
+    )
+
+
+def build_prompt(record, task, input_mode="text"):
+    """Return the task question over either original text or the gold graph."""
+    if input_mode == "text":
+        puzzle = record["prompt"]
+    elif input_mode == "gold_graph":
+        puzzle = build_gold_graph_problem(record)
+    else:
+        raise ValueError(f"Unknown input mode: {input_mode}")
     if task == "binary":
         # Naming the queried speaker is conservative toward direct prompting:
         # the graph-based evaluator also knows this identity from metadata.
@@ -48,16 +73,16 @@ def build_prompt(record, task):
         )
     else:
         raise ValueError(f"Unknown task: {task}")
-    return record["prompt"] + "\n\nFinal question: " + question
+    return puzzle + "\n\nFinal question: " + question
 
 
-def evaluate_one(model, record, task, api_key, max_tokens):
+def evaluate_one(model, record, task, api_key, max_tokens, input_mode="text"):
     start = time.monotonic()
     raw = None
     usage = {}
     error = None
     try:
-        response = ask_openrouter(model["id"], build_prompt(record, task),
+        response = ask_openrouter(model["id"], build_prompt(record, task, input_mode),
                                   api_key, max_tokens)
         content = response["choices"][0]["message"].get("content")
         raw = content if isinstance(content, str) else ""
@@ -74,6 +99,7 @@ def evaluate_one(model, record, task, api_key, max_tokens):
             prediction = parse_list_answer(raw, record["witnesses"])
     return {
         "model": model["id"],
+        "input_mode": input_mode,
         "id": record["id"],
         "task": task,
         "gold": record["gold_binary" if task == "binary" else "gold_accepted"],
@@ -94,6 +120,7 @@ def main():
                         default=Path("experiments/graph_models.json"))
     parser.add_argument("--workers", type=int, default=3)
     parser.add_argument("--max-tokens", type=int, default=1536)
+    parser.add_argument("--input-mode", choices=["text", "gold_graph"], default="text")
     parser.add_argument("--output-dir", type=Path,
                         default=Path("results/direct_varied"))
     parser.add_argument("--dry-run", action="store_true")
@@ -107,12 +134,13 @@ def main():
     args.output_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
         "models": models,
+        "input_mode": args.input_mode,
         "sample_ids": [r["id"] for r in cases],
         "system_prompt": SYSTEM_PROMPT,
         "user_prompt_example": {
             "id": cases[0]["id"],
-            "binary": build_prompt(cases[0], "binary"),
-            "multi_label": build_prompt(cases[0], "multi_label"),
+            "binary": build_prompt(cases[0], "binary", args.input_mode),
+            "multi_label": build_prompt(cases[0], "multi_label", args.input_mode),
         },
         "temperature": 0,
         "max_tokens": args.max_tokens,
@@ -136,7 +164,7 @@ def main():
         with (args.output_dir / "responses.jsonl").open("w", encoding="utf-8") as handle:
             with ThreadPoolExecutor(max_workers=args.workers) as pool:
                 futures = [pool.submit(evaluate_one, model, record, task,
-                                       api_key, args.max_tokens)
+                                       api_key, args.max_tokens, args.input_mode)
                            for model in models for record in cases for task in TASKS]
                 for future in as_completed(futures):
                     row = future.result()
